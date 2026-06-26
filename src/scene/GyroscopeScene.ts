@@ -3,31 +3,14 @@ import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import type { SpinningTopPhysics } from '../physics/SpinningTopPhysics';
+import { createTopProfile, radiusAtHeight } from '../topProfile';
+import { TABLE_RADIUS } from './tableSurface';
 
-const OUTER_GREEN = 0x3dff7a;
-const INNER_GREEN = 0x8fd4a8;
+export { TABLE_RADIUS };
+
+const LINE_COLOR = 0x7a1515;
 const BOLD_WIDTH = 2;
 const FINE_WIDTH = 1;
-
-/** Build a lathe profile matching the totem-style spinning top. */
-function createTopProfile(): THREE.Vector2[] {
-  const key = [
-    new THREE.Vector2(0.0, 0.0),
-    new THREE.Vector2(0.012, 0.012),
-    new THREE.Vector2(0.028, 0.018),
-    new THREE.Vector2(0.055, 0.032),
-    new THREE.Vector2(0.054, 0.038),
-    new THREE.Vector2(0.028, 0.042),
-    new THREE.Vector2(0.012, 0.048),
-    new THREE.Vector2(0.007, 0.09),
-    new THREE.Vector2(0.006, 0.13),
-    new THREE.Vector2(0.007, 0.155),
-    new THREE.Vector2(0.003, 0.165),
-  ];
-  // Smooth spline so meridians hug the curved outer edge
-  const curve = new THREE.SplineCurve(key);
-  return curve.getPoints(72);
-}
 
 function meridianPoints(profile: THREE.Vector2[], azimuth: number): THREE.Vector3[] {
   const c = Math.cos(azimuth);
@@ -35,18 +18,76 @@ function meridianPoints(profile: THREE.Vector2[], azimuth: number): THREE.Vector
   return profile.map((p) => new THREE.Vector3(p.x * c, p.y, p.x * s));
 }
 
-/** Meridian arc on one curved outer section (continuous). */
-function meridianSection(
+function radiusDerivative(profile: THREE.Vector2[], y: number): number {
+  const h = 0.0015;
+  const y0 = Math.max(h, y);
+  return (radiusAtHeight(profile, y0 + h) - radiusAtHeight(profile, y0 - h)) / (2 * h);
+}
+
+/** Wide-to-narrow collar — where the flare meets the stem. */
+function findCollarBand(profile: THREE.Vector2[]): { start: number; end: number } {
+  let maxR = 0;
+  let yPeak = 0;
+  for (const p of profile) {
+    if (p.x > maxR) {
+      maxR = p.x;
+      yPeak = p.y;
+    }
+  }
+
+  let yEnd = yPeak;
+  for (const p of profile) {
+    if (p.y > yPeak && p.x < maxR * 0.4) {
+      yEnd = p.y;
+      break;
+    }
+  }
+
+  return { start: yPeak - 0.006, end: yEnd + 0.003 };
+}
+
+function collectContourRingHeights(
   profile: THREE.Vector2[],
-  azimuth: number,
-  yMin: number,
-  yMax: number,
-): THREE.Vector3[] {
-  const c = Math.cos(azimuth);
-  const s = Math.sin(azimuth);
-  return profile
-    .filter((p) => p.y >= yMin && p.y <= yMax)
-    .map((p) => new THREE.Vector3(p.x * c, p.y, p.x * s));
+  yTop: number,
+  skipY?: number,
+): number[] {
+  const heights = new Set<number>();
+  const minY = 0.006;
+  const roundY = (y: number) => Math.round(y * 1000) / 1000;
+
+  const maybeAdd = (y: number) => {
+    if (y < minY || y >= yTop - 0.005) return;
+    if (skipY !== undefined && Math.abs(y - skipY) < 0.004) return;
+    if (radiusAtHeight(profile, y) < 0.001) return;
+    heights.add(roundY(y));
+  };
+
+  for (let y = minY; y < yTop - 0.005; ) {
+    maybeAdd(y);
+
+    const r = radiusAtHeight(profile, y);
+    const drDy = radiusDerivative(profile, y);
+    const narrowing = drDy < -0.08;
+    const narrowRate = -drDy;
+
+    let step = 0.022;
+    if (narrowing && narrowRate > 0.55) step = 0.003;
+    else if (narrowing && narrowRate > 0.3) step = 0.005;
+    else if (narrowing && narrowRate > 0.12) step = 0.008;
+    else if (r > 0.035) step = 0.006;
+    else if (r > 0.022) step = 0.010;
+    else if (r > 0.012) step = 0.016;
+
+    y += step;
+  }
+
+  // Extra rings at the wide→narrow collar (the curved undercut below the disk).
+  const collar = findCollarBand(profile);
+  for (let y = collar.start; y <= collar.end; y += 0.003) {
+    maybeAdd(y);
+  }
+
+  return [...heights].sort((a, b) => a - b);
 }
 
 function circlePoints(y: number, radius: number, segments: number): THREE.Vector3[] {
@@ -75,7 +116,7 @@ function makeLine(
     linewidth,
     worldUnits: false,
     transparent: true,
-    opacity: tag === 'bold' ? 1 : 0.7,
+    opacity: tag === 'bold' ? 1 : 0.8,
   });
   material.resolution.set(window.innerWidth, window.innerHeight);
 
@@ -99,38 +140,62 @@ export function createSpinningTopMesh(): THREE.Group {
 
   const profile = createTopProfile();
   const yTop = profile[profile.length - 1].y;
+  const diskY = 0.032;
+  const diskR = 0.055;
+  // Default camera in main.ts: position (0.28, 0.18, 0.42)
+  const viewAzimuth = Math.atan2(0.42, 0.28);
 
-  // ── Bold 2 px outer silhouette ──
+  // ── Bold 2 px — outer envelope ──
   const outerGroup = new THREE.Group();
   outerGroup.name = 'outerLines';
   spinGroup.add(outerGroup);
 
-  // Elevation outlines (meridians)
-  outerGroup.add(makeLine(meridianPoints(profile, 0), BOLD_WIDTH, OUTER_GREEN, 'bold'));
-  outerGroup.add(makeLine(meridianPoints(profile, Math.PI / 2), BOLD_WIDTH, OUTER_GREEN, 'bold'));
+  // Vertical: silhouette meridians (side edges from this view)
+  outerGroup.add(
+    makeLine(meridianPoints(profile, viewAzimuth + Math.PI / 2), BOLD_WIDTH, LINE_COLOR, 'bold'),
+  );
+  outerGroup.add(
+    makeLine(meridianPoints(profile, viewAzimuth - Math.PI / 2), BOLD_WIDTH, LINE_COLOR, 'bold'),
+  );
 
-  // Bold outermost contour rings
-  outerGroup.add(makeLine(circlePoints(0.032, 0.055, 72), BOLD_WIDTH, OUTER_GREEN, 'bold'));
-  outerGroup.add(makeLine(circlePoints(yTop, 0.003, 32), BOLD_WIDTH, OUTER_GREEN, 'bold'));
+  // Horizontal: widest disk contour
+  outerGroup.add(makeLine(circlePoints(diskY, diskR, 80), BOLD_WIDTH, LINE_COLOR, 'bold'));
 
-  // ── Fine 1 px — few meridians hugging the curved outer edge ──
+  // ── Fine 1 px — interior grid following the same surface ──
   const innerGroup = new THREE.Group();
   innerGroup.name = 'innerLines';
   spinGroup.add(innerGroup);
 
-  const fineAngles = [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4];
-  // Curved outer sections: tip cone + disk flare
-  const edgeSections: [number, number][] = [
-    [0, 0.022],
-    [0.015, 0.045],
-  ];
-  for (const az of fineAngles) {
-    for (const [yMin, yMax] of edgeSections) {
-      const pts = meridianSection(profile, az, yMin, yMax);
-      if (pts.length > 2) {
-        innerGroup.add(makeLine(pts, FINE_WIDTH, INNER_GREEN, 'fine'));
-      }
-    }
+  // Vertical: front-side ribs between the bold silhouette edges
+  innerGroup.add(
+    makeLine(meridianPoints(profile, viewAzimuth + Math.PI / 4), FINE_WIDTH, LINE_COLOR, 'fine'),
+  );
+  innerGroup.add(
+    makeLine(meridianPoints(profile, viewAzimuth - Math.PI / 4), FINE_WIDTH, LINE_COLOR, 'fine'),
+  );
+  // Vertical: back-side ribs (visible through the wireframe)
+  innerGroup.add(
+    makeLine(meridianPoints(profile, viewAzimuth), FINE_WIDTH, LINE_COLOR, 'fine'),
+  );
+  innerGroup.add(
+    makeLine(meridianPoints(profile, viewAzimuth + Math.PI), FINE_WIDTH, LINE_COLOR, 'fine'),
+  );
+
+  // Central spin axis
+  innerGroup.add(
+    makeLine(
+      [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, yTop, 0)],
+      FINE_WIDTH,
+      LINE_COLOR,
+      'fine',
+    ),
+  );
+
+  // Horizontal: contour rings — denser on the wide flare, sparser on the stem
+  for (const y of collectContourRingHeights(profile, yTop, diskY)) {
+    const r = radiusAtHeight(profile, y);
+    const segments = r > 0.03 ? 72 : 56;
+    innerGroup.add(makeLine(circlePoints(y, r, segments), FINE_WIDTH, LINE_COLOR, 'fine'));
   }
 
   return root;
@@ -201,38 +266,5 @@ export function updateVectorArrow(
   arrow.setLength(len, len * 0.12, len * 0.06);
 }
 
-export function createGround(): THREE.Mesh {
-  const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(1.2, 64),
-    new THREE.MeshStandardMaterial({
-      color: 0x0e1218,
-      metalness: 0.2,
-      roughness: 0.85,
-    }),
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = 0;
-  return ground;
-}
-
-export function createTable(): THREE.Group {
-  const table = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({
-    color: 0x141820,
-    metalness: 0.05,
-    roughness: 0.9,
-  });
-
-  const top = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.2, 1.2, 0.025, 64),
-    wood,
-  );
-  top.position.y = -0.012;
-  table.add(top);
-
-  return table;
-}
-
 export const createGyroscopeMesh = createSpinningTopMesh;
 export const updateGyroscopeMesh = updateSpinningTopMesh;
-export const createPivotStand = createTable;

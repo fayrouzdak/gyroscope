@@ -3,40 +3,44 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { SpinningTopPhysics } from './physics/SpinningTopPhysics';
 import {
   createSpinningTopMesh,
-  createGround,
-  createTable,
   createVectorArrow,
   updateSpinningTopMesh,
   updateSpinningTopLineResolution,
   updateVectorArrow,
 } from './scene/GyroscopeScene';
+import {
+  InteractionController,
+  type InteractionMode,
+} from './interactions/InteractionController';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+const canvasFrame = document.getElementById('canvas-frame')!;
 const statsEl = document.getElementById('stats')!;
 const spinBtn = document.getElementById('spin') as HTMLButtonElement;
 const spinSlider = document.getElementById('spin-speed') as HTMLInputElement;
 const spinValue = document.getElementById('spin-value')!;
+const frictionSlider = document.getElementById('friction') as HTMLInputElement;
+const frictionValue = document.getElementById('friction-value')!;
 const gravityCheck = document.getElementById('gravity') as HTMLInputElement;
 const vectorsCheck = document.getElementById('vectors') as HTMLInputElement;
 const resetBtn = document.getElementById('reset') as HTMLButtonElement;
+const interactionHint = document.getElementById('interaction-hint')!;
+const modeButtons = document.querySelectorAll<HTMLButtonElement>('.mode-btn');
+
+const CREAM = 0xfdf9f3;
+const FOREST = 0x004d2c;
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x12151c);
+scene.background = new THREE.Color(CREAM);
 
-const camera = new THREE.PerspectiveCamera(
-  40,
-  window.innerWidth / window.innerHeight,
-  0.01,
-  30,
-);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 30);
 camera.position.set(0.28, 0.18, 0.42);
 
 const controls = new OrbitControls(camera, canvas);
@@ -51,28 +55,27 @@ controls.mouseButtons = {
   RIGHT: THREE.MOUSE.ROTATE,
 };
 
-scene.add(new THREE.AmbientLight(0x505870, 0.55));
+scene.add(new THREE.AmbientLight(0xfdf9f3, 0.75));
 
-const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.8);
+const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.4);
 keyLight.position.set(1.2, 2, 1.5);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(1024, 1024);
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0x8090b0, 0.55);
+const fillLight = new THREE.DirectionalLight(0xe8f0ea, 0.45);
 fillLight.position.set(-1.5, 0.6, -0.8);
 scene.add(fillLight);
-
-scene.add(createTable());
-scene.add(createGround());
 
 const physics = new SpinningTopPhysics();
 const topMesh = createSpinningTopMesh();
 scene.add(topMesh);
 
-const L_ARROW = createVectorArrow(0x4ecdc4, 0.25);
-const TAU_ARROW = createVectorArrow(0xff6b6b, 0.25);
-const AXIS_ARROW = createVectorArrow(0xd8dde6, 0.2);
+const interactions = new InteractionController(scene, physics);
+
+const L_ARROW = createVectorArrow(FOREST, 0.25);
+const TAU_ARROW = createVectorArrow(0x8b3a3a, 0.25);
+const AXIS_ARROW = createVectorArrow(0x333333, 0.2);
 scene.add(L_ARROW, TAU_ARROW, AXIS_ARROW);
 
 const raycaster = new THREE.Raycaster();
@@ -81,10 +84,20 @@ const _origin = new THREE.Vector3();
 const _L = new THREE.Vector3();
 const _tau = new THREE.Vector3();
 const _axis = new THREE.Vector3();
-const _dragPrev = new THREE.Vector2();
+const _grabHit = new THREE.Vector3();
+const _grabDir = new THREE.Vector3();
+const _grabCurr = new THREE.Vector3();
+const _grabQuat = new THREE.Quaternion();
+const _grabSphere = new THREE.Sphere();
+const _grabSpinAxis = new THREE.Vector3();
+const _rayClosest = new THREE.Vector3();
+
+const TABLE_TOP = new THREE.Vector3(0, 0, 0);
 
 let dragging = false;
 let hovered = false;
+let grabRadius = 0.06;
+let grabSpinAngle = 0;
 
 function setPointerFromEvent(e: PointerEvent): void {
   const rect = canvas.getBoundingClientRect();
@@ -97,31 +110,112 @@ function hitTop(): boolean {
   return raycaster.intersectObject(topMesh, true).length > 0;
 }
 
+function pointerToSphereDir(out: THREE.Vector3): boolean {
+  _grabSphere.center.copy(TABLE_TOP);
+  _grabSphere.radius = grabRadius;
+  raycaster.setFromCamera(pointer, camera);
+
+  const hit = raycaster.ray.intersectSphere(_grabSphere, _grabHit);
+  if (hit) {
+    out.copy(_grabHit).sub(TABLE_TOP);
+  } else {
+    raycaster.ray.closestPointToPoint(_grabSphere.center, _rayClosest);
+    out.copy(_rayClosest).sub(TABLE_TOP);
+  }
+
+  if (out.lengthSq() < 1e-8) return false;
+  out.normalize();
+  return true;
+}
+
+function beginGrab(): boolean {
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObject(topMesh, true);
+  if (hits.length === 0) return false;
+
+  _grabHit.copy(hits[0].point);
+  grabRadius = Math.max(_grabHit.distanceTo(TABLE_TOP), 0.04);
+  _grabDir.copy(_grabHit).sub(TABLE_TOP).normalize();
+  physics.getSpinAxis(_grabSpinAxis);
+  grabSpinAngle = physics.spinAngle;
+  return true;
+}
+
+const FRICTION_MAX = 1;
+
+function frictionSliderToValue(value: number): number {
+  const t = value / 100;
+  return t * t * FRICTION_MAX;
+}
+
+function frictionValueToSlider(friction: number): number {
+  if (friction <= 0) return 0;
+  return Math.round(Math.sqrt(friction / FRICTION_MAX) * 100);
+}
+
+function formatFrictionLabel(friction: number): string {
+  if (friction <= 0) return 'none';
+  const seconds = physics.estimateSpinDownSeconds(physics.targetSpinRate);
+  if (!Number.isFinite(seconds)) return '—';
+  if (seconds >= 60) return `~${(seconds / 60).toFixed(1)} min to fall`;
+  if (seconds < 10) return `~${seconds.toFixed(1)} s to fall`;
+  return `~${seconds.toFixed(0)} s to fall`;
+}
+
 function syncSpinUi(): void {
   spinSlider.value = String(Math.round(physics.targetSpinRate));
   spinValue.textContent = `${Math.round(physics.targetSpinRate)} rad/s`;
 }
 
+function syncFrictionUi(): void {
+  frictionSlider.value = String(frictionValueToSlider(physics.params.friction));
+  frictionValue.textContent = formatFrictionLabel(physics.params.friction);
+}
+
 canvas.addEventListener('pointermove', (e) => {
   if (e.buttons === 2) return;
   setPointerFromEvent(e);
-  hovered = hitTop();
-  canvas.style.cursor = dragging ? 'grabbing' : hovered ? 'grab' : 'default';
+  raycaster.setFromCamera(pointer, camera);
 
-  if (dragging) {
-    const dx = e.clientX - _dragPrev.x;
-    const dy = e.clientY - _dragPrev.y;
-    _dragPrev.set(e.clientX, e.clientY);
-    physics.applyDrag(-dx * 0.004, dy * 0.003);
+  if (interactions.handlePointerMove(raycaster)) {
+    canvas.style.cursor = interactions.mode === 'trace' ? 'crosshair' : 'pointer';
+    return;
+  }
+
+  hovered = hitTop();
+  const modeCursor =
+    interactions.mode === 'bump'
+      ? 'pointer'
+      : interactions.mode === 'wind' || interactions.mode === 'trace'
+        ? 'crosshair'
+        : dragging
+          ? 'grabbing'
+          : hovered
+            ? 'grab'
+            : 'default';
+  canvas.style.cursor = modeCursor;
+
+  if (dragging && pointerToSphereDir(_grabCurr)) {
+    _grabQuat.setFromUnitVectors(_grabDir, _grabCurr);
+    physics.applyTipPivotDrag(_grabQuat, _grabSpinAxis, grabSpinAngle);
   }
 });
 
 canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   setPointerFromEvent(e);
-  if (hitTop()) {
+  raycaster.setFromCamera(pointer, camera);
+
+  if (interactions.handlePointerDown(raycaster)) {
+    if (interactions.mode === 'wind' || interactions.mode === 'trace') {
+      canvas.setPointerCapture(e.pointerId);
+    }
+    return;
+  }
+  if (interactions.consumesTopDrag()) return;
+
+  if (beginGrab()) {
     dragging = true;
-    _dragPrev.set(e.clientX, e.clientY);
     controls.enabled = false;
     canvas.setPointerCapture(e.pointerId);
   }
@@ -129,6 +223,10 @@ canvas.addEventListener('pointerdown', (e) => {
 
 canvas.addEventListener('pointerup', (e) => {
   if (e.button !== 0) return;
+  setPointerFromEvent(e);
+  raycaster.setFromCamera(pointer, camera);
+  interactions.handlePointerUp(raycaster);
+
   dragging = false;
   controls.enabled = true;
   canvas.releasePointerCapture(e.pointerId);
@@ -137,6 +235,16 @@ canvas.addEventListener('pointerup', (e) => {
 canvas.addEventListener('pointerleave', () => {
   dragging = false;
   controls.enabled = true;
+  interactions.cancelGesture();
+});
+
+modeButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode as InteractionMode;
+    interactions.setMode(mode);
+    modeButtons.forEach((b) => b.classList.toggle('active', b === btn));
+    interactionHint.textContent = interactions.getHint();
+  });
 });
 
 spinBtn.addEventListener('click', () => {
@@ -148,17 +256,30 @@ spinSlider.addEventListener('input', () => {
   spinValue.textContent = `${Math.round(physics.targetSpinRate)} rad/s`;
 });
 
+frictionSlider.addEventListener('input', () => {
+  physics.params.friction = frictionSliderToValue(Number(frictionSlider.value));
+  frictionValue.textContent = formatFrictionLabel(physics.params.friction);
+});
+
 resetBtn.addEventListener('click', () => {
   physics.reset();
   syncSpinUi();
 });
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+function resize(): void {
+  const { width, height } = canvasFrame.getBoundingClientRect();
+  if (width < 1 || height < 1) return;
+
+  camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  updateSpinningTopLineResolution(topMesh, window.innerWidth, window.innerHeight);
-});
+  renderer.setSize(width, height, false);
+  updateSpinningTopLineResolution(topMesh, width, height);
+}
+
+const resizeObserver = new ResizeObserver(resize);
+resizeObserver.observe(canvasFrame);
+window.addEventListener('resize', resize);
+resize();
 
 const FIXED_DT = 1 / 120;
 let accumulator = 0;
@@ -169,7 +290,16 @@ function updateStats(): void {
   physics.getAngularMomentum(_L);
   physics.getGravityTorque(_tau);
   const precession = physics.getPrecessionRate(gravityCheck.checked);
-  const status = physics.isSpinning() ? 'spinning' : 'at rest';
+  const fallen = physics.getTiltDegrees() > 80;
+  const status = fallen
+    ? 'fallen'
+    : physics.isSpinning()
+      ? physics.isSideways()
+        ? 'sideways'
+        : physics.getTiltDegrees() > 2
+          ? 'wobbling'
+          : 'spinning'
+      : 'at rest';
 
   statsEl.innerHTML = [
     `Status: ${status}`,
@@ -188,7 +318,11 @@ function animate(now: number): void {
   accumulator += frameDt;
 
   while (accumulator >= FIXED_DT) {
-    physics.step(FIXED_DT, gravityCheck.checked);
+    if (dragging) {
+      physics.stepSpinOnly(FIXED_DT);
+    } else {
+      physics.step(FIXED_DT, gravityCheck.checked);
+    }
     accumulator -= FIXED_DT;
   }
 
@@ -210,9 +344,11 @@ function animate(now: number): void {
   }
 
   updateStats();
+  interactions.update(frameDt);
   controls.update();
   renderer.render(scene, camera);
 }
 
 syncSpinUi();
+syncFrictionUi();
 animate(performance.now());

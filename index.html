@@ -3,34 +3,64 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Spinning Top</title>
+    <title>Gyroscope</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="app">
-      <canvas id="canvas"></canvas>
-      <div id="hud">
-        <h1>Spinning Top</h1>
-        <p class="hint">
-          Click Spin to start · Drag to tilt · Right-drag to orbit camera
-        </p>
-        <div class="stats" id="stats"></div>
-        <div class="controls">
-          <button id="spin" class="primary">Spin</button>
-          <label>
-            Spin speed
-            <input type="range" id="spin-speed" min="20" max="200" value="80" step="1" />
-            <span id="spin-value">80 rad/s</span>
-          </label>
-          <label>
-            Gravity
-            <input type="checkbox" id="gravity" checked />
-          </label>
-          <label>
-            Show vectors
-            <input type="checkbox" id="vectors" checked />
-          </label>
-          <button id="reset">Reset</button>
+      <div id="canvas-frame">
+        <canvas id="canvas"></canvas>
+      </div>
+
+      <div id="panel">
+        <div class="panel-box">
+          <div class="stats" id="stats"></div>
+
+          <div class="controls">
+            <button id="spin" class="primary">Spin</button>
+            <label>
+              Spin speed
+              <input type="range" id="spin-speed" min="20" max="200" value="80" step="1" />
+              <span id="spin-value">80 rad/s</span>
+            </label>
+            <label>
+              Friction
+              <input type="range" id="friction" min="0" max="100" value="74" step="1" />
+              <span id="friction-value">—</span>
+            </label>
+            <label>
+              Gravity
+              <input type="checkbox" id="gravity" checked />
+            </label>
+            <label>
+              Show vectors
+              <input type="checkbox" id="vectors" checked />
+            </label>
+            <button id="reset">Reset</button>
+          </div>
+
+          <p class="panel-hint">
+            Click Spin to start · Drag to tilt · Right-drag to orbit camera
+          </p>
+
+          <div class="interactions">
+            <div class="interactions-header">Interactions</div>
+            <div class="interaction-modes" role="tablist">
+              <button type="button" class="mode-btn active" data-mode="tilt">Tilt</button>
+              <button type="button" class="mode-btn" data-mode="bump">Table bump</button>
+              <button type="button" class="mode-btn" data-mode="wind">Wind</button>
+              <button type="button" class="mode-btn" data-mode="trace">Trace path</button>
+            </div>
+            <p class="interaction-hint" id="interaction-hint">
+              Drag the top to tilt it.
+            </p>
+          </div>
         </div>
       </div>
     </div>
