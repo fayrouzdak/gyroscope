@@ -26,8 +26,6 @@ const vectorsCheck = document.getElementById('vectors') as HTMLInputElement;
 const resetBtn = document.getElementById('reset') as HTMLButtonElement;
 const interactionHint = document.getElementById('interaction-hint')!;
 const modeButtons = document.querySelectorAll<HTMLButtonElement>('.mode-btn');
-const popoverTriggers = document.querySelectorAll<HTMLButtonElement>('[data-popover]');
-const popovers = document.querySelectorAll<HTMLElement>('.popover');
 
 const CREAM = 0xf8f8f8;
 const FOREST = 0x004d2c;
@@ -157,7 +155,8 @@ function frictionValueToSlider(friction: number): number {
 
 function formatFrictionLabel(friction: number): string {
   if (friction <= 0) return 'none';
-  const seconds = physics.estimateSpinDownSeconds(physics.targetSpinRate);
+  const rate = physics.spinRate > 0 ? physics.spinRate : physics.targetSpinRate;
+  const seconds = physics.estimateSpinDownSeconds(rate);
   if (!Number.isFinite(seconds)) return '—';
   if (seconds >= 60) return `~${(seconds / 60).toFixed(1)} min to fall`;
   if (seconds < 10) return `~${seconds.toFixed(1)} s to fall`;
@@ -182,47 +181,51 @@ function updateSpinButton(): void {
   spinBtn.setAttribute('aria-pressed', String(spinning));
 }
 
-function closeAllPopovers(): void {
-  popovers.forEach((popover) => {
-    popover.hidden = true;
-  });
-  popoverTriggers.forEach((trigger) => {
-    trigger.classList.remove('active');
-  });
+const toolbar = document.querySelector('.toolbar') as HTMLElement;
+const toolbarMenus = document.querySelector('.toolbar-menus') as HTMLElement;
+let hideMenuTimer: ReturnType<typeof setTimeout> | null = null;
+
+function setActiveMenu(menu: string | null): void {
+  if (menu) {
+    toolbar.dataset.activeMenu = menu;
+    toolbarMenus.removeAttribute('aria-hidden');
+  } else {
+    delete toolbar.dataset.activeMenu;
+    toolbarMenus.setAttribute('aria-hidden', 'true');
+  }
 }
 
-function positionPopover(popover: HTMLElement, trigger: HTMLElement): void {
-  const panel = document.getElementById('panel')!;
-  const panelRect = panel.getBoundingClientRect();
-  const triggerRect = trigger.getBoundingClientRect();
-  const popoverWidth = popover.offsetWidth;
-  const left = triggerRect.left - panelRect.left + triggerRect.width / 2 - popoverWidth / 2;
-  const clampedLeft = Math.max(0, Math.min(left, panelRect.width - popoverWidth));
-  popover.style.left = `${clampedLeft}px`;
-  popover.style.transform = 'none';
+function cancelHideMenu(): void {
+  if (hideMenuTimer !== null) {
+    clearTimeout(hideMenuTimer);
+    hideMenuTimer = null;
+  }
 }
 
-popoverTriggers.forEach((trigger) => {
-  trigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const popover = document.getElementById(trigger.dataset.popover!)!;
-    const willOpen = popover.hidden;
-    closeAllPopovers();
-    if (willOpen) {
-      popover.hidden = false;
-      trigger.classList.add('active');
-      positionPopover(popover, trigger);
-    }
+function scheduleHideMenu(): void {
+  cancelHideMenu();
+  hideMenuTimer = setTimeout(() => setActiveMenu(null), 180);
+}
+
+document.querySelectorAll<HTMLElement>('.toolbar-popover').forEach((trigger) => {
+  trigger.addEventListener('mouseenter', () => {
+    cancelHideMenu();
+    setActiveMenu(trigger.dataset.menu ?? null);
   });
+  trigger.addEventListener('mouseleave', scheduleHideMenu);
 });
 
-popovers.forEach((popover) => {
-  popover.addEventListener('click', (e) => e.stopPropagation());
-});
+toolbarMenus.addEventListener('mouseenter', cancelHideMenu);
+toolbarMenus.addEventListener('mouseleave', scheduleHideMenu);
 
-document.addEventListener('click', closeAllPopovers);
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeAllPopovers();
+document.querySelectorAll<HTMLElement>('.popover-anchor').forEach((anchor) => {
+  anchor.addEventListener('focusin', () => {
+    cancelHideMenu();
+    setActiveMenu(anchor.dataset.menu ?? null);
+  });
+  anchor.addEventListener('focusout', (e) => {
+    if (!anchor.contains(e.relatedTarget as Node)) scheduleHideMenu();
+  });
 });
 
 canvas.addEventListener('pointermove', (e) => {
@@ -311,7 +314,7 @@ spinBtn.addEventListener('click', () => {
 });
 
 spinSlider.addEventListener('input', () => {
-  physics.targetSpinRate = Number(spinSlider.value);
+  physics.setTargetSpinRate(Number(spinSlider.value));
   spinValue.textContent = `${Math.round(physics.targetSpinRate)} rad/s`;
 });
 

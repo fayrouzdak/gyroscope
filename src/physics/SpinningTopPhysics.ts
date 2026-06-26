@@ -99,6 +99,17 @@ export class SpinningTopPhysics {
     this.spinRate = 0;
   }
 
+  /** Set desired spin rate; applies immediately if the top is already spinning. */
+  setTargetSpinRate(rate: number): void {
+    this.targetSpinRate = rate;
+    if (this.spinRate > 0) {
+      this.spinRate = rate;
+      if (this.tracePath && rate > 1) {
+        this.prepareTraceRoll();
+      }
+    }
+  }
+
   /** Flick the top — sets spin to the speed chosen on the slider. */
   spinUp(): void {
     this.spinRate = this.targetSpinRate;

@@ -66,6 +66,7 @@ body {
 }
 
 .toolbar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -192,30 +193,64 @@ body {
   height: 1rem;
 }
 
-.icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--white);
+.toolbar-popover {
+  position: relative;
 }
 
+.toolbar-popover:hover .icon-btn,
+.icon-btn:hover,
+.toolbar[data-active-menu='simulation'] .toolbar-popover[data-menu='simulation'] .icon-btn,
+.toolbar[data-active-menu='interactions'] .toolbar-popover[data-menu='interactions'] .icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--white);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.toolbar-popover:hover .icon-btn:active,
 .icon-btn:active {
-  transform: scale(0.92);
-  background: rgba(255, 255, 255, 0.05);
+  transform: scale(0.97);
+  background: transparent;
+  box-shadow: none;
 }
 
-.icon-btn.active {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--white);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+.toolbar-menus {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  min-height: 9rem;
+  padding-bottom: 0.5rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.toolbar[data-active-menu] .toolbar-menus {
+  pointer-events: auto;
+}
+
+.popover-anchor {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0;
+  right: 0;
+  width: 100%;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.toolbar[data-active-menu='simulation'] .popover-anchor[data-menu='simulation'],
+.toolbar[data-active-menu='interactions'] .popover-anchor[data-menu='interactions'] {
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .popover {
-  position: absolute;
-  bottom: calc(100% + 0.5rem);
-  left: 0;
-  min-width: 11rem;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--glass-border);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
@@ -223,10 +258,6 @@ body {
     0 8px 32px rgba(0, 0, 0, 0.18),
     inset 0 1px 0 var(--glass-highlight);
   color: var(--glass-text);
-}
-
-.popover-wide {
-  min-width: 14.5rem;
 }
 
 .popover-label {
@@ -252,10 +283,22 @@ body {
 
 .popover-value {
   flex-shrink: 0;
+  width: 5rem;
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
   color: var(--glass-text-muted);
   white-space: nowrap;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.popover-section + .popover-section {
+  margin-top: 0.55rem;
+}
+
+.popover-section + .popover-check {
+  margin-top: 0.55rem;
 }
 
 .popover-check {
@@ -350,9 +393,5 @@ body {
 
   .toolbar {
     justify-content: center;
-  }
-
-  .popover {
-    max-width: calc(100vw - 1.5rem);
   }
 }
