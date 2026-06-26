@@ -8,7 +8,7 @@ import { TABLE_RADIUS } from './tableSurface';
 
 export { TABLE_RADIUS };
 
-const LINE_COLOR = 0x1a8540;
+const LINE_COLOR = 0xc4510a;
 const BOLD_WIDTH = 2;
 const FINE_WIDTH = 1;
 

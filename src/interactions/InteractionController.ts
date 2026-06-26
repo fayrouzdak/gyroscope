@@ -5,13 +5,6 @@ import { TABLE_RADIUS, intersectPlayPlane } from '../scene/tableSurface';
 
 export type InteractionMode = 'tilt' | 'bump' | 'wind' | 'trace';
 
-const MODE_HINTS: Record<InteractionMode, string> = {
-  tilt: 'Drag the top to tilt it.',
-  bump: 'Click near the outer edge to send a ripple impulse.',
-  wind: 'Drag gently through open space — a soft puff, not a tap.',
-  trace: 'Draw a path, then spin — or spin first, then draw. The tip rolls along immediately.',
-};
-
 export class InteractionController {
   mode: InteractionMode = 'tilt';
 
@@ -42,10 +35,6 @@ export class InteractionController {
   setMode(mode: InteractionMode): void {
     this.mode = mode;
     this.cancelGesture();
-  }
-
-  getHint(): string {
-    return MODE_HINTS[this.mode];
   }
 
   consumesTopDrag(): boolean {

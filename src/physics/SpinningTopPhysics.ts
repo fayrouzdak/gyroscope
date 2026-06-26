@@ -3,7 +3,7 @@ import { buildSurfaceSamples } from '../topProfile';
 import type { TracePath } from './TracePath';
 import { CirclePath } from './TracePath';
 
-/** Tip friction torque scales (rad/s² and 1/s at friction = 1). */
+/** Tip friction torque scales (rad/s² and 1/s at friction = 1; slider max ≈ 2). */
 const COULOMB_FRICTION = 3.0;
 const VISCOUS_FRICTION = 0.07;
 /** Extra tip load when tilted: multiplier = 1 + gain·sin²θ (≈3× when horizontal). */
@@ -16,7 +16,7 @@ export interface TopParams {
   mass: number;
   comHeight: number;
   gravity: number;
-  /** 0 = frictionless, 1 = heavy tip + air drag */
+  /** 0 = frictionless; higher = heavier tip + air drag (slider max ≈ 2) */
   friction: number;
 }
 

@@ -24,13 +24,12 @@ const frictionValue = document.getElementById('friction-value')!;
 const gravityCheck = document.getElementById('gravity') as HTMLInputElement;
 const vectorsCheck = document.getElementById('vectors') as HTMLInputElement;
 const resetBtn = document.getElementById('reset') as HTMLButtonElement;
-const interactionHint = document.getElementById('interaction-hint')!;
 const modeButtons = document.querySelectorAll<HTMLButtonElement>('.mode-btn');
 
 const CREAM = 0xf8f8f8;
 const FOREST = 0x004d2c;
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -141,7 +140,7 @@ function beginGrab(): boolean {
   return true;
 }
 
-const FRICTION_MAX = 1;
+const FRICTION_MAX = 2;
 
 function frictionSliderToValue(value: number): number {
   const t = value / 100;
@@ -189,9 +188,53 @@ function setActiveMenu(menu: string | null): void {
   if (menu) {
     toolbar.dataset.activeMenu = menu;
     toolbarMenus.removeAttribute('aria-hidden');
+    requestAnimationFrame(updateMenuFrost);
   } else {
     delete toolbar.dataset.activeMenu;
     toolbarMenus.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function updateMenuFrost(): void {
+  const menu = toolbar.dataset.activeMenu;
+  if (!menu) return;
+
+  const popover = document.querySelector<HTMLElement>(
+    `.popover-anchor[data-menu="${menu}"] .popover`,
+  );
+  if (!popover) return;
+
+  const frostCanvas = popover.querySelector<HTMLCanvasElement>('.popover-frost canvas');
+  if (!frostCanvas) return;
+
+  const popRect = popover.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  if (popRect.width <= 0 || popRect.height <= 0) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(popRect.width * dpr));
+  const h = Math.max(1, Math.round(popRect.height * dpr));
+
+  if (frostCanvas.width !== w || frostCanvas.height !== h) {
+    frostCanvas.width = w;
+    frostCanvas.height = h;
+    frostCanvas.style.width = `${popRect.width}px`;
+    frostCanvas.style.height = `${popRect.height}px`;
+  }
+
+  const ctx = frostCanvas.getContext('2d');
+  if (!ctx) return;
+
+  const sx = (popRect.left - canvasRect.left) * dpr;
+  const sy = (popRect.top - canvasRect.top) * dpr;
+  const sw = popRect.width * dpr;
+  const sh = popRect.height * dpr;
+
+  try {
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, w, h);
+  } catch {
+    // Canvas readback unavailable.
   }
 }
 
@@ -234,7 +277,8 @@ canvas.addEventListener('pointermove', (e) => {
   raycaster.setFromCamera(pointer, camera);
 
   if (interactions.handlePointerMove(raycaster)) {
-    canvas.style.cursor = interactions.mode === 'trace' ? 'crosshair' : 'pointer';
+    canvas.style.cursor =
+      interactions.mode === 'trace' ? 'crosshair' : 'pointer';
     return;
   }
 
@@ -299,7 +343,6 @@ modeButtons.forEach((btn) => {
     const mode = btn.dataset.mode as InteractionMode;
     interactions.setMode(mode);
     modeButtons.forEach((b) => b.classList.toggle('active', b === btn));
-    interactionHint.textContent = interactions.getHint();
   });
 });
 
@@ -418,6 +461,9 @@ function animate(now: number): void {
   interactions.update(frameDt);
   controls.update();
   renderer.render(scene, camera);
+  if (toolbar.dataset.activeMenu) {
+    updateMenuFrost();
+  }
 }
 
 syncSpinUi();

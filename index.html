@@ -76,60 +76,107 @@
               <div class="toolbar-menus" aria-hidden="true">
                 <div class="popover-anchor" data-menu="simulation">
                   <div class="popover" id="popover-simulation">
+                    <div class="popover-frost" aria-hidden="true"><canvas></canvas></div>
+                    <div class="popover-surface">
                     <div class="popover-section">
-                      <div class="popover-label">Spin speed</div>
                       <div class="popover-row">
+                        <div class="popover-field">
+                          <div class="popover-label">Speed</div>
+                          <span class="popover-value" id="spin-value">25 rad/s</span>
+                        </div>
                         <input type="range" id="spin-speed" min="5" max="100" value="25" step="1" />
-                        <span class="popover-value" id="spin-value">25 rad/s</span>
                       </div>
                     </div>
                     <div class="popover-section">
-                      <div class="popover-label">Friction</div>
                       <div class="popover-row">
+                        <div class="popover-field">
+                          <div class="popover-label">Friction</div>
+                          <span class="popover-value" id="friction-value">—</span>
+                        </div>
                         <input type="range" id="friction" min="0" max="100" value="74" step="1" />
-                        <span class="popover-value" id="friction-value">—</span>
                       </div>
                     </div>
                     <label class="popover-check">
-                      <input type="checkbox" id="gravity" checked />
-                      Gravity
+                      <span class="popover-check-label">Gravity</span>
+                      <span class="toggle">
+                        <input type="checkbox" id="gravity" checked />
+                        <span class="toggle-track" aria-hidden="true"></span>
+                      </span>
                     </label>
                     <label class="popover-check">
-                      <input type="checkbox" id="vectors" checked />
-                      Show vectors
+                      <span class="popover-check-label">Vectors</span>
+                      <span class="toggle">
+                        <input type="checkbox" id="vectors" checked />
+                        <span class="toggle-track" aria-hidden="true"></span>
+                      </span>
                     </label>
+                    </div>
                   </div>
                 </div>
                 <div class="popover-anchor" data-menu="interactions">
-                  <div class="popover popover-wide" id="popover-interactions">
+                  <div class="popover popover-dropdown" id="popover-interactions">
+                    <div class="popover-frost" aria-hidden="true"><canvas></canvas></div>
+                    <div class="popover-surface">
                     <div class="interaction-modes" role="tablist" aria-label="Interaction modes">
-                      <button type="button" class="mode-btn active" data-mode="tilt" title="Tilt">
-                        <svg viewBox="0 0 16 16" aria-hidden="true">
-                          <path d="M5 11.5V6l3-3.5 3 3.5v5.5" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <span>Tilt</span>
+                      <button type="button" class="mode-btn active" data-mode="tilt">
+                        <span class="mode-btn-head">
+                          <span class="mode-btn-icon" aria-hidden="true">
+                            <svg class="mode-icon" viewBox="0 0 24 24">
+                              <path d="M12 5C14.9242 5 17.6088 5.60544 19.5898 6.62012C21.531 7.61437 23 9.12264 23 11C23 12.8774 21.531 14.3856 19.5898 15.3799C17.7343 16.3303 15.2615 16.9211 12.5527 16.9922L14.0303 18.4697C14.3232 18.7626 14.3232 19.2374 14.0303 19.5303C13.7374 19.8232 13.2626 19.8232 12.9697 19.5303L10.2197 16.7803C9.92683 16.4874 9.92683 16.0126 10.2197 15.7197L12.9697 12.9697C13.2626 12.6768 13.7374 12.6768 14.0303 12.9697C14.3232 13.2626 14.3232 13.7374 14.0303 14.0303L12.5693 15.4902C15.0744 15.4173 17.2983 14.8685 18.9062 14.0449C20.6747 13.1391 21.5 12.0221 21.5 11C21.5 9.97792 20.6747 8.86093 18.9062 7.95508C17.1775 7.06963 14.7367 6.5 12 6.5C9.26327 6.5 6.82248 7.06963 5.09375 7.95508C3.32527 8.86093 2.5 9.97792 2.5 11C2.5 11.6389 2.81199 12.3052 3.49609 12.9521C4.18255 13.6013 5.20464 14.1891 6.49414 14.6377C6.88535 14.7738 7.09216 15.2016 6.95605 15.5928C6.81982 15.9838 6.39208 16.1908 6.00098 16.0547C4.57632 15.559 3.34955 14.8776 2.46582 14.042C1.57962 13.2039 1 12.1686 1 11C1 9.12264 2.46903 7.61437 4.41016 6.62012C6.39119 5.60544 9.07581 5 12 5Z" fill="currentColor" />
+                            </svg>
+                            <svg class="mode-check" viewBox="0 0 24 24">
+                              <path fill-rule="evenodd" clip-rule="evenodd" d="M19.4299 4.20121C20.0092 4.57669 20.1744 5.3507 19.799 5.93002L11.049 19.43C10.835 19.7601 10.4782 19.9702 10.0858 19.9972C9.69333 20.0242 9.31109 19.8649 9.05399 19.5672L4.30399 14.0672C3.85276 13.5447 3.91052 12.7554 4.433 12.3041C4.95547 11.8529 5.74482 11.9106 6.19605 12.4331L9.85717 16.6723L17.7011 4.57028C18.0766 3.99096 18.8506 3.82573 19.4299 4.20121Z" fill="currentColor" />
+                            </svg>
+                          </span>
+                          <span class="mode-btn-name">Tilt</span>
+                        </span>
+                        <span class="mode-caption">Drag the top to tilt it.</span>
                       </button>
-                      <button type="button" class="mode-btn" data-mode="bump" title="Table bump">
-                        <svg viewBox="0 0 16 16" aria-hidden="true">
-                          <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.25" />
-                          <path d="M8 2.5v2M8 11.5v2M2.5 8h2M11.5 8h2" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
-                        </svg>
-                        <span>Bump</span>
+                      <button type="button" class="mode-btn" data-mode="bump">
+                        <span class="mode-btn-head">
+                          <span class="mode-btn-icon" aria-hidden="true">
+                            <svg class="mode-icon" viewBox="0 0 24 24">
+                              <path fill-rule="evenodd" clip-rule="evenodd" d="M4.30523 9.50117C3.86611 9.76669 3.33777 10 2.75 10C2.33579 10 2 9.66421 2 9.25C2 8.83579 2.33579 8.5 2.75 8.5C2.94339 8.5 3.19298 8.42081 3.52907 8.21758C3.86431 8.01487 4.20974 7.73714 4.6035 7.41762C4.61402 7.40908 4.62458 7.40051 4.63519 7.3919C5.00222 7.09399 5.41507 6.7589 5.8368 6.50087C6.26916 6.23634 6.79252 6 7.375 6C7.96055 6 8.4868 6.23456 8.9231 6.49968C9.35333 6.76112 9.77246 7.10128 10.1437 7.40254L10.1623 7.41763C10.5569 7.73789 10.9012 8.01573 11.2347 8.21876C11.5694 8.42254 11.814 8.5 12 8.5C12.1825 8.5 12.4248 8.42337 12.7589 8.21931C13.0916 8.01613 13.4353 7.73823 13.8304 7.41763L13.8429 7.40749C14.216 7.10467 14.6381 6.76215 15.0723 6.49914C15.5104 6.23375 16.038 6 16.625 6C17.2062 6 17.7284 6.23708 18.1592 6.50135C18.5775 6.75799 18.9878 7.09104 19.3531 7.38759L19.3901 7.41761C19.7835 7.73684 20.1294 8.01452 20.4654 8.21711C20.8021 8.42013 21.0537 8.5 21.25 8.5C21.6642 8.5 22 8.83579 22 9.25C22 9.66421 21.6642 10 21.25 10C20.661 10 20.1315 9.76737 19.6908 9.50164C19.2509 9.23638 18.8247 8.89051 18.4488 8.58549L18.445 8.58239C18.0493 8.26129 17.7063 7.98331 17.3747 7.7799C17.0415 7.57542 16.8025 7.5 16.625 7.5C16.4335 7.5 16.1852 7.57875 15.8495 7.78211C15.5147 7.98491 15.1695 8.26266 14.7756 8.58237L14.7473 8.60535C14.3791 8.90413 13.9647 9.24053 13.5408 9.49944C13.1074 9.76413 12.5833 10 12 10C11.4153 10 10.8898 9.76496 10.4546 9.49999C10.0267 9.23949 9.60936 8.90074 9.2393 8.6004L9.21708 8.58237C8.82269 8.26232 8.47811 7.9845 8.14415 7.78157C7.80905 7.57794 7.56305 7.5 7.375 7.5C7.19444 7.5 6.95344 7.57616 6.61965 7.78038C6.28742 7.98365 5.94399 8.26158 5.54867 8.58238L5.53954 8.58978C5.16532 8.89346 4.74163 9.23728 4.30523 9.50117ZM4.30523 17.5012C3.86611 17.7667 3.33777 18 2.75 18C2.33579 18 2 17.6642 2 17.25C2 16.8358 2.33579 16.5 2.75 16.5C2.94339 16.5 3.19298 16.4208 3.52907 16.2176C3.86431 16.0149 4.20974 15.7371 4.6035 15.4176L4.6352 15.3919C5.00223 15.094 5.41507 14.7589 5.8368 14.5009C6.26916 14.2363 6.79252 14 7.375 14C7.96055 14 8.4868 14.2346 8.9231 14.4997C9.35334 14.7611 9.77247 15.1013 10.1437 15.4025L10.1623 15.4176C10.5569 15.7379 10.9012 16.0157 11.2347 16.2188C11.5694 16.4225 11.814 16.5 12 16.5C12.1825 16.5 12.4248 16.4234 12.7589 16.2193C13.0916 16.0161 13.4353 15.7382 13.8304 15.4176L13.8429 15.4075C14.216 15.1047 14.6381 14.7622 15.0723 14.4991C15.5104 14.2337 16.038 14 16.625 14C17.2062 14 17.7284 14.2371 18.1592 14.5014C18.5775 14.758 18.9878 15.091 19.3531 15.3876C19.3655 15.3976 19.3778 15.4076 19.3901 15.4176C19.7835 15.7368 20.1294 16.0145 20.4654 16.2171C20.8021 16.4201 21.0537 16.5 21.25 16.5C21.6642 16.5 22 16.8358 22 17.25C22 17.6642 21.6642 18 21.25 18C20.661 18 20.1315 17.7674 19.6908 17.5016C19.2509 17.2364 18.8247 16.8905 18.4488 16.5855L18.445 16.5824C18.0493 16.2613 17.7063 15.9833 17.3747 15.7799C17.0415 15.5754 16.8025 15.5 16.625 15.5C16.4335 15.5 16.1852 15.5788 15.8495 15.7821C15.5147 15.9849 15.1695 16.2627 14.7756 16.5824L14.7472 16.6054C14.3791 16.9041 13.9647 17.2405 13.5408 17.4994C13.1074 17.7641 12.5833 18 12 18C11.4153 18 10.8898 17.765 10.4546 17.5C10.0267 17.2395 9.60936 16.9007 9.2393 16.6004L9.21708 16.5824C8.82269 16.2623 8.47811 15.9845 8.14415 15.7816C7.80905 15.5779 7.56305 15.5 7.375 15.5C7.19444 15.5 6.95344 15.5762 6.61965 15.7804C6.28742 15.9837 5.94399 16.2616 5.54867 16.5824L5.53955 16.5898C5.16533 16.8935 4.74164 17.2373 4.30523 17.5012Z" fill="currentColor" />
+                            </svg>
+                            <svg class="mode-check" viewBox="0 0 24 24">
+                              <path fill-rule="evenodd" clip-rule="evenodd" d="M19.4299 4.20121C20.0092 4.57669 20.1744 5.3507 19.799 5.93002L11.049 19.43C10.835 19.7601 10.4782 19.9702 10.0858 19.9972C9.69333 20.0242 9.31109 19.8649 9.05399 19.5672L4.30399 14.0672C3.85276 13.5447 3.91052 12.7554 4.433 12.3041C4.95547 11.8529 5.74482 11.9106 6.19605 12.4331L9.85717 16.6723L17.7011 4.57028C18.0766 3.99096 18.8506 3.82573 19.4299 4.20121Z" fill="currentColor" />
+                            </svg>
+                          </span>
+                          <span class="mode-btn-name">Bump</span>
+                        </span>
+                        <span class="mode-caption">Click near the outer edge to send a ripple impulse.</span>
                       </button>
-                      <button type="button" class="mode-btn" data-mode="wind" title="Wind">
-                        <svg viewBox="0 0 16 16" aria-hidden="true">
-                          <path d="M2.5 5.5h7a2 2 0 1 0 0-4M2.5 10.5h9a2.2 2.2 0 1 1 0 4.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
-                        </svg>
-                        <span>Wind</span>
+                      <button type="button" class="mode-btn" data-mode="wind">
+                        <span class="mode-btn-head">
+                          <span class="mode-btn-icon" aria-hidden="true">
+                            <svg class="mode-icon" viewBox="0 0 24 24">
+                              <path fill-rule="evenodd" clip-rule="evenodd" d="M11.25 4.5C10.8668 4.5 10.5264 4.6717 10.2949 4.94797C10.0289 5.26546 9.55581 5.30719 9.23832 5.04116C8.92082 4.77514 8.8791 4.3021 9.14512 3.98461C9.6474 3.38515 10.4014 3 11.25 3C12.7688 3 14 4.23122 14 5.75C14 7.26878 12.7688 8.5 11.25 8.5L2.75 8.50001C2.33579 8.50001 2 8.16422 2 7.75001C2 7.3358 2.33579 7.00001 2.75 7.00001L11.25 7C11.9404 7 12.5 6.44036 12.5 5.75C12.5 5.05964 11.9404 4.5 11.25 4.5ZM19.25 8.75001C18.8653 8.75001 18.5216 8.92291 18.2912 9.19798C18.0251 9.51547 17.5521 9.5572 17.2346 9.29117C16.9171 9.02515 16.8754 8.55211 17.1414 8.23462C17.6447 7.63396 18.4029 7.25001 19.25 7.25001C20.7688 7.25001 22 8.48123 22 10C22 11.5188 20.7688 12.75 19.25 12.75H2.75C2.33579 12.75 2 12.4142 2 12C2 11.5858 2.33579 11.25 2.75 11.25H19.25C19.9404 11.25 20.5 10.6904 20.5 10C20.5 9.30965 19.9404 8.75001 19.25 8.75001ZM2 16.25C2 15.8358 2.33579 15.5 2.75 15.5H15.25C16.7688 15.5 18 16.7312 18 18.25C18 19.7688 16.7688 21 15.25 21C14.3144 21 13.4882 20.5321 12.9926 19.8209C12.7558 19.481 12.8393 19.0135 13.1792 18.7767C13.519 18.5399 13.9865 18.6235 14.2233 18.9633C14.4504 19.2892 14.8256 19.5 15.25 19.5C15.9404 19.5 16.5 18.9404 16.5 18.25C16.5 17.5597 15.9404 17 15.25 17H2.75C2.33579 17 2 16.6642 2 16.25Z" fill="currentColor" />
+                            </svg>
+                            <svg class="mode-check" viewBox="0 0 24 24">
+                              <path fill-rule="evenodd" clip-rule="evenodd" d="M19.4299 4.20121C20.0092 4.57669 20.1744 5.3507 19.799 5.93002L11.049 19.43C10.835 19.7601 10.4782 19.9702 10.0858 19.9972C9.69333 20.0242 9.31109 19.8649 9.05399 19.5672L4.30399 14.0672C3.85276 13.5447 3.91052 12.7554 4.433 12.3041C4.95547 11.8529 5.74482 11.9106 6.19605 12.4331L9.85717 16.6723L17.7011 4.57028C18.0766 3.99096 18.8506 3.82573 19.4299 4.20121Z" fill="currentColor" />
+                            </svg>
+                          </span>
+                          <span class="mode-btn-name">Wind</span>
+                        </span>
+                        <span class="mode-caption">Drag gently through open space, a soft puff, not a tap.</span>
                       </button>
-                      <button type="button" class="mode-btn" data-mode="trace" title="Trace path">
-                        <svg viewBox="0 0 16 16" aria-hidden="true">
-                          <path d="M2.5 12.5c2-4 4-6 6-8.5 1.5-1.8 3-2.5 5-2" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
-                        </svg>
-                        <span>Trace</span>
+                      <button type="button" class="mode-btn" data-mode="trace">
+                        <span class="mode-btn-head">
+                          <span class="mode-btn-icon" aria-hidden="true">
+                            <svg class="mode-icon" viewBox="0 0 24 24">
+                              <path d="M15.7626 2.92663C16.446 2.24321 17.554 2.24321 18.2374 2.92663L20.0732 4.76241C20.7566 5.44583 20.7566 6.55387 20.0732 7.23729L6.82322 20.4873C6.49503 20.8155 6.04991 20.9998 5.58579 20.9998H2.75C2.33579 20.9998 2 20.6641 2 20.2498V17.4141C2 16.9499 2.18437 16.5048 2.51256 16.1766L15.7626 2.92663Z" fill="currentColor" />
+                              <path d="M21.5663 18.4918L21.5676 18.4903C21.8383 18.1768 21.8037 17.7032 21.4903 17.4324C21.1769 17.1618 20.7035 17.1963 20.4327 17.5095L20.4261 17.5168C20.4192 17.5246 20.4075 17.5374 20.3914 17.5547C20.3592 17.5892 20.3095 17.641 20.2446 17.7043C20.1139 17.8317 19.9261 18.0013 19.699 18.1696C19.2229 18.5224 18.675 18.7944 18.166 18.7944C17.6346 18.7944 17.124 18.5421 16.4177 18.1672L16.3494 18.131C15.7225 17.7975 14.9093 17.365 13.9866 17.365C12.2062 17.365 11.1671 18.2154 10.2046 19.2352C9.92027 19.5364 9.93398 20.0111 10.2352 20.2954C10.5364 20.5797 11.0111 20.566 11.2954 20.2648C12.1526 19.3567 12.8215 18.865 13.9866 18.865C14.5028 18.865 15.0037 19.1149 15.7145 19.4922L15.7677 19.5205C16.4011 19.8571 17.2241 20.2944 18.166 20.2944C19.1571 20.2944 20.0262 19.7942 20.5921 19.3748C20.886 19.157 21.1254 18.9405 21.2917 18.7783C21.3753 18.6968 21.4415 18.628 21.4881 18.578C21.5114 18.5531 21.5299 18.5328 21.5432 18.5179L21.5593 18.4997L21.5645 18.4939L21.5663 18.4918Z" fill="currentColor" />
+                            </svg>
+                            <svg class="mode-check" viewBox="0 0 24 24">
+                              <path fill-rule="evenodd" clip-rule="evenodd" d="M19.4299 4.20121C20.0092 4.57669 20.1744 5.3507 19.799 5.93002L11.049 19.43C10.835 19.7601 10.4782 19.9702 10.0858 19.9972C9.69333 20.0242 9.31109 19.8649 9.05399 19.5672L4.30399 14.0672C3.85276 13.5447 3.91052 12.7554 4.433 12.3041C4.95547 11.8529 5.74482 11.9106 6.19605 12.4331L9.85717 16.6723L17.7011 4.57028C18.0766 3.99096 18.8506 3.82573 19.4299 4.20121Z" fill="currentColor" />
+                            </svg>
+                          </span>
+                          <span class="mode-btn-name">Trace</span>
+                        </span>
+                        <span class="mode-caption">Draw a path, then spin, or spin first, then draw. The tip rolls along immediately.</span>
                       </button>
                     </div>
-                    <p class="interaction-hint" id="interaction-hint">Drag the top to tilt it.</p>
+                    </div>
                   </div>
                 </div>
               </div>
