@@ -26,8 +26,10 @@ const vectorsCheck = document.getElementById('vectors') as HTMLInputElement;
 const resetBtn = document.getElementById('reset') as HTMLButtonElement;
 const interactionHint = document.getElementById('interaction-hint')!;
 const modeButtons = document.querySelectorAll<HTMLButtonElement>('.mode-btn');
+const popoverTriggers = document.querySelectorAll<HTMLButtonElement>('[data-popover]');
+const popovers = document.querySelectorAll<HTMLElement>('.popover');
 
-const CREAM = 0xfdf9f3;
+const CREAM = 0xf8f8f8;
 const FOREST = 0x004d2c;
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -55,7 +57,7 @@ controls.mouseButtons = {
   RIGHT: THREE.MOUSE.ROTATE,
 };
 
-scene.add(new THREE.AmbientLight(0xfdf9f3, 0.75));
+scene.add(new THREE.AmbientLight(0xf8f8f8, 0.75));
 
 const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.4);
 keyLight.position.set(1.2, 2, 1.5);
@@ -172,6 +174,57 @@ function syncFrictionUi(): void {
   frictionValue.textContent = formatFrictionLabel(physics.params.friction);
 }
 
+function updateSpinButton(): void {
+  const spinning = physics.isSpinning();
+  const label = spinBtn.querySelector('.cta-btn-label');
+  if (label) label.textContent = spinning ? 'Stop' : 'Spin';
+  spinBtn.classList.toggle('active', spinning);
+  spinBtn.setAttribute('aria-pressed', String(spinning));
+}
+
+function closeAllPopovers(): void {
+  popovers.forEach((popover) => {
+    popover.hidden = true;
+  });
+  popoverTriggers.forEach((trigger) => {
+    trigger.classList.remove('active');
+  });
+}
+
+function positionPopover(popover: HTMLElement, trigger: HTMLElement): void {
+  const panel = document.getElementById('panel')!;
+  const panelRect = panel.getBoundingClientRect();
+  const triggerRect = trigger.getBoundingClientRect();
+  const popoverWidth = popover.offsetWidth;
+  const left = triggerRect.left - panelRect.left + triggerRect.width / 2 - popoverWidth / 2;
+  const clampedLeft = Math.max(0, Math.min(left, panelRect.width - popoverWidth));
+  popover.style.left = `${clampedLeft}px`;
+  popover.style.transform = 'none';
+}
+
+popoverTriggers.forEach((trigger) => {
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const popover = document.getElementById(trigger.dataset.popover!)!;
+    const willOpen = popover.hidden;
+    closeAllPopovers();
+    if (willOpen) {
+      popover.hidden = false;
+      trigger.classList.add('active');
+      positionPopover(popover, trigger);
+    }
+  });
+});
+
+popovers.forEach((popover) => {
+  popover.addEventListener('click', (e) => e.stopPropagation());
+});
+
+document.addEventListener('click', closeAllPopovers);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeAllPopovers();
+});
+
 canvas.addEventListener('pointermove', (e) => {
   if (e.buttons === 2) return;
   setPointerFromEvent(e);
@@ -248,7 +301,13 @@ modeButtons.forEach((btn) => {
 });
 
 spinBtn.addEventListener('click', () => {
-  physics.spinUp();
+  if (physics.isSpinning()) {
+    physics.stopSpin();
+  } else {
+    physics.spinUp();
+    interactions.onSpin();
+  }
+  updateSpinButton();
 });
 
 spinSlider.addEventListener('input', () => {
@@ -262,8 +321,13 @@ frictionSlider.addEventListener('input', () => {
 });
 
 resetBtn.addEventListener('click', () => {
+  dragging = false;
+  controls.enabled = true;
   physics.reset();
+  interactions.onPhysicsReset();
   syncSpinUi();
+  updateSpinButton();
+  updateSpinningTopMesh(topMesh, physics);
 });
 
 function resize(): void {
@@ -307,7 +371,10 @@ function updateStats(): void {
     `|L|: ${_L.length().toFixed(4)} kg·m²/s`,
     `Precession Ω: ${precession.toFixed(3)} rad/s`,
     `Tilt: ${physics.getTiltDegrees().toFixed(1)}° from vertical`,
-  ].join('<br>');
+    physics.hasActiveTrace()
+      ? `Path speed: ${physics.getPathSpeed().toFixed(3)} m/s`
+      : '',
+  ].filter(Boolean).join('<br>');
 }
 
 function animate(now: number): void {
@@ -334,9 +401,9 @@ function animate(now: number): void {
     physics.getGravityTorque(_tau);
     physics.getSpinAxis(_axis);
 
-    updateVectorArrow(L_ARROW, _origin, _L, 0.12);
-    updateVectorArrow(TAU_ARROW, _origin, _tau, 0.35);
-    updateVectorArrow(AXIS_ARROW, physics.getTipPosition(_origin), _axis, 0.22);
+    updateVectorArrow(L_ARROW, _origin, _L, 0.07);
+    updateVectorArrow(TAU_ARROW, _origin, _tau, 0.2);
+    updateVectorArrow(AXIS_ARROW, physics.getTipPosition(_origin), _axis, 0.2);
   } else {
     L_ARROW.visible = false;
     TAU_ARROW.visible = false;
@@ -344,6 +411,7 @@ function animate(now: number): void {
   }
 
   updateStats();
+  updateSpinButton();
   interactions.update(frameDt);
   controls.update();
   renderer.render(scene, camera);
@@ -351,4 +419,5 @@ function animate(now: number): void {
 
 syncSpinUi();
 syncFrictionUi();
+updateSpinButton();
 animate(performance.now());

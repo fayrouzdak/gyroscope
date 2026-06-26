@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { SpinningTopPhysics } from '../physics/SpinningTopPhysics';
+import { parseTracePath, type TracePath } from '../physics/TracePath';
 import { TABLE_RADIUS, intersectPlayPlane } from '../scene/tableSurface';
 
 export type InteractionMode = 'tilt' | 'bump' | 'wind' | 'trace';
@@ -8,48 +9,8 @@ const MODE_HINTS: Record<InteractionMode, string> = {
   tilt: 'Drag the top to tilt it.',
   bump: 'Click near the outer edge to send a ripple impulse.',
   wind: 'Drag gently through open space — a soft puff, not a tap.',
-  trace: 'Draw a closed circle in the air above the pivot to steer precession.',
+  trace: 'Draw a path, then spin — or spin first, then draw. The tip rolls along immediately.',
 };
-
-interface CircleFit {
-  cx: number;
-  cz: number;
-  radius: number;
-  clockwise: boolean;
-}
-
-function fitCircle(points: THREE.Vector3[]): CircleFit | null {
-  if (points.length < 10) return null;
-
-  let cx = 0;
-  let cz = 0;
-  for (const p of points) {
-    cx += p.x;
-    cz += p.z;
-  }
-  cx /= points.length;
-  cz /= points.length;
-
-  let radius = 0;
-  for (const p of points) {
-    radius += Math.hypot(p.x - cx, p.z - cz);
-  }
-  radius /= points.length;
-  if (radius < 0.04) return null;
-
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (Math.hypot(first.x - last.x, first.z - last.z) > radius * 0.75) return null;
-
-  let area = 0;
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i];
-    const b = points[(i + 1) % points.length];
-    area += a.x * b.z - b.x * a.z;
-  }
-
-  return { cx, cz, radius, clockwise: area < 0 };
-}
 
 export class InteractionController {
   mode: InteractionMode = 'tilt';
@@ -64,10 +25,13 @@ export class InteractionController {
   private tracePoints: THREE.Vector3[] = [];
 
   private pathLine: THREE.Line | null = null;
-  private circleLine: THREE.Line | null = null;
+  private committedPathLine: THREE.Line | null = null;
+  private pathFadeLife = 0;
   private windArrow: THREE.ArrowHelper | null = null;
   private bumpRing: THREE.Mesh | null = null;
   private bumpRingLife = 0;
+
+  private static readonly PATH_FADE_DURATION = 0.55;
 
   constructor(scene: THREE.Scene, physics: SpinningTopPhysics) {
     this.physics = physics;
@@ -88,6 +52,17 @@ export class InteractionController {
     return this.mode !== 'tilt';
   }
 
+  onPhysicsReset(): void {
+    this.cancelGesture();
+  }
+
+  /** Fade out the committed path when the top starts spinning. */
+  onSpin(): void {
+    if (this.committedPathLine && this.pathFadeLife <= 0) {
+      this.pathFadeLife = InteractionController.PATH_FADE_DURATION;
+    }
+  }
+
   update(dt: number): void {
     if (this.bumpRing && this.bumpRingLife > 0) {
       this.bumpRingLife -= dt;
@@ -100,6 +75,15 @@ export class InteractionController {
         this.bumpRing.geometry.dispose();
         (this.bumpRing.material as THREE.Material).dispose();
         this.bumpRing = null;
+      }
+    }
+
+    if (this.committedPathLine && this.pathFadeLife > 0) {
+      this.pathFadeLife -= dt;
+      const t = 1 - this.pathFadeLife / InteractionController.PATH_FADE_DURATION;
+      (this.committedPathLine.material as THREE.LineBasicMaterial).opacity = 0.85 * (1 - t);
+      if (this.pathFadeLife <= 0) {
+        this.clearCommittedPath();
       }
     }
   }
@@ -166,11 +150,12 @@ export class InteractionController {
     }
 
     if (this.mode === 'trace' && this.traceActive) {
-      const fit = fitCircle(this.tracePoints);
-      if (fit && this.physics.setPrecessionFromCircle(fit.cx, fit.cz, fit.radius, fit.clockwise)) {
-        this.showCircleGuide(fit);
+      const path = parseTracePath(this.tracePoints);
+      const seed = this.tracePoints[0];
+      if (path && this.physics.setTracePath(path, seed.x, seed.z)) {
+        this.commitPath(path);
       } else {
-        this.clearCircleGuide();
+        this.clearCommittedPath();
       }
       this.clearPathLine();
       this.traceActive = false;
@@ -187,6 +172,7 @@ export class InteractionController {
     this.tracePoints = [];
     this.clearWindArrow();
     this.clearPathLine();
+    this.clearCommittedPath();
   }
 
   private hitTable(raycaster: THREE.Raycaster): boolean {
@@ -212,38 +198,28 @@ export class InteractionController {
     this.pathLine = null;
   }
 
-  private showCircleGuide(fit: CircleFit): void {
-    this.clearCircleGuide();
-    const pts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 96; i++) {
-      const t = (i / 96) * Math.PI * 2;
-      pts.push(new THREE.Vector3(
-        fit.cx + Math.cos(t) * fit.radius,
-        0.002,
-        fit.cz + Math.sin(t) * fit.radius,
-      ));
-    }
-    const mat = new THREE.LineDashedMaterial({
+  private commitPath(path: TracePath): void {
+    this.clearCommittedPath();
+    this.pathFadeLife = 0;
+
+    const pts = path.getGuidePoints().map((p) => new THREE.Vector3(p.x, 0.002, p.z));
+    const mat = new THREE.LineBasicMaterial({
       color: 0x004d2c,
       transparent: true,
-      opacity: 0.45,
-      dashSize: 0.04,
-      gapSize: 0.025,
+      opacity: 0.85,
     });
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    this.circleLine = new THREE.Line(geo, mat);
-    this.circleLine.computeLineDistances();
-    this.overlay.add(this.circleLine);
-
-    window.setTimeout(() => this.clearCircleGuide(), 2200);
+    this.committedPathLine = new THREE.Line(geo, mat);
+    this.overlay.add(this.committedPathLine);
   }
 
-  private clearCircleGuide(): void {
-    if (!this.circleLine) return;
-    this.overlay.remove(this.circleLine);
-    this.circleLine.geometry.dispose();
-    (this.circleLine.material as THREE.Material).dispose();
-    this.circleLine = null;
+  private clearCommittedPath(): void {
+    if (!this.committedPathLine) return;
+    this.overlay.remove(this.committedPathLine);
+    this.committedPathLine.geometry.dispose();
+    (this.committedPathLine.material as THREE.Material).dispose();
+    this.committedPathLine = null;
+    this.pathFadeLife = 0;
   }
 
   private updateWindArrow(target: THREE.Vector3): void {

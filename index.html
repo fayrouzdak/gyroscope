@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/style.css" />
@@ -16,50 +16,153 @@
     <div id="app">
       <div id="canvas-frame">
         <canvas id="canvas"></canvas>
-      </div>
+        <div class="stats" id="stats"></div>
 
-      <div id="panel">
-        <div class="panel-box">
-          <div class="stats" id="stats"></div>
+        <div id="panel">
+          <div class="panel-box">
+            <div class="toolbar" role="toolbar" aria-label="Simulation controls">
+              <div class="toolbar-group toolbar-cta">
+                <button id="spin" class="cta-btn primary" type="button">
+                  <svg class="cta-btn-icon cta-btn-icon-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M7.65703 2.27884C6.49076 1.57201 5 2.41169 5 3.77543V20.2247C5 21.5884 6.49076 22.4281 7.65703 21.7213L21.2276 13.4966C22.3516 12.8155 22.3516 11.1846 21.2276 10.5035L7.65703 2.27884Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  <svg class="cta-btn-icon cta-btn-icon-stop" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M5.75 3C4.7835 3 4 3.7835 4 4.75V19.25C4 20.2165 4.7835 21 5.75 21H8.25C9.2165 21 10 20.2165 10 19.25V4.75C10 3.7835 9.2165 3 8.25 3H5.75Z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M15.75 3C14.7835 3 14 3.7835 14 4.75V19.25C14 20.2165 14.7835 21 15.75 21H18.25C19.2165 21 20 20.2165 20 19.25V4.75C20 3.7835 19.2165 3 18.25 3H15.75Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  <span class="cta-btn-label">Spin</span>
+                </button>
+                <button id="reset" class="cta-btn" type="button">Reset</button>
+              </div>
 
-          <div class="controls">
-            <button id="spin" class="primary">Spin</button>
-            <label>
-              Spin speed
-              <input type="range" id="spin-speed" min="20" max="200" value="80" step="1" />
-              <span id="spin-value">80 rad/s</span>
-            </label>
-            <label>
-              Friction
-              <input type="range" id="friction" min="0" max="100" value="74" step="1" />
-              <span id="friction-value">—</span>
-            </label>
-            <label>
-              Gravity
-              <input type="checkbox" id="gravity" checked />
-            </label>
-            <label>
-              Show vectors
-              <input type="checkbox" id="vectors" checked />
-            </label>
-            <button id="reset">Reset</button>
-          </div>
+              <div class="toolbar-divider" aria-hidden="true"></div>
 
-          <p class="panel-hint">
-            Click Spin to start · Drag to tilt · Right-drag to orbit camera
-          </p>
-
-          <div class="interactions">
-            <div class="interactions-header">Interactions</div>
-            <div class="interaction-modes" role="tablist">
-              <button type="button" class="mode-btn active" data-mode="tilt">Tilt</button>
-              <button type="button" class="mode-btn" data-mode="bump">Table bump</button>
-              <button type="button" class="mode-btn" data-mode="wind">Wind</button>
-              <button type="button" class="mode-btn" data-mode="trace">Trace path</button>
+              <div class="toolbar-group toolbar-icons">
+                <button
+                  type="button"
+                  class="icon-btn"
+                  data-popover="popover-speed"
+                  aria-label="Spin speed"
+                  title="Spin speed"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M10.1084 2.17902C10.5151 2.10117 10.9083 2.36811 10.9863 2.77473C11.064 3.18137 10.7973 3.57377 10.3906 3.65168C6.46583 4.40339 3.50016 7.85679 3.5 12.0003C3.5001 14.6981 4.75662 17.1022 6.71875 18.6605C7.04287 18.918 7.09622 19.3899 6.83887 19.7142C6.58123 20.0384 6.10945 20.0928 5.78516 19.8353C3.48023 18.0047 2.0001 15.1749 2 12.0003C2.00016 7.1238 5.49017 3.06363 10.1084 2.17902Z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M13.0137 2.77473C13.0917 2.36811 13.4849 2.10117 13.8916 2.17902C18.5099 3.06363 21.9998 7.1238 22 12.0003C21.9999 15.1749 20.5198 18.0047 18.2148 19.8353C17.8905 20.0928 17.4188 20.0384 17.1611 19.7142C16.9038 19.3899 16.9571 18.918 17.2812 18.6605C19.2434 17.1022 20.4999 14.6981 20.5 12.0003C20.4998 7.85678 17.5342 4.40339 13.6094 3.65168C13.2027 3.57377 12.936 3.18138 13.0137 2.77473Z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M11.5938 7.77277C11.7664 7.42656 12.2346 7.42656 12.4072 7.77277C12.9919 8.94522 14.0008 11.2242 14.001 12.9993C14.001 14.1037 13.1053 14.9991 12.001 14.9993C10.8964 14.9993 10.001 14.1039 10.001 12.9993C10.0011 11.2242 11.0091 8.94522 11.5938 7.77277Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  data-popover="popover-friction"
+                  aria-label="Friction"
+                  title="Friction"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M2.5 5.5h11M2.5 8h11M2.5 10.5h11" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  data-popover="popover-display"
+                  aria-label="Display options"
+                  title="Display"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 2.5v11M8 8H3.5M8 8h4.5" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
+                    <path d="M3.5 5.5l4.5 2.5 4.5-2.5M3.5 10.5l4.5-2.5 4.5 2.5" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  data-popover="popover-interactions"
+                  aria-label="Interaction mode"
+                  title="Interactions"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M3.5 2.5l1.5 8 2-1.5 2.5 4.5 1.5-1-2.5-4.5 2.5-1.5-1.5-4.5z" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <p class="interaction-hint" id="interaction-hint">
-              Drag the top to tilt it.
-            </p>
+
+            <div class="popover" id="popover-speed" hidden>
+              <div class="popover-label">Spin speed</div>
+              <div class="popover-row">
+                <input type="range" id="spin-speed" min="5" max="100" value="25" step="1" />
+                <span class="popover-value" id="spin-value">25 rad/s</span>
+              </div>
+            </div>
+
+            <div class="popover" id="popover-friction" hidden>
+              <div class="popover-label">Friction</div>
+              <div class="popover-row">
+                <input type="range" id="friction" min="0" max="100" value="74" step="1" />
+                <span class="popover-value" id="friction-value">—</span>
+              </div>
+            </div>
+
+            <div class="popover" id="popover-display" hidden>
+              <label class="popover-check">
+                <input type="checkbox" id="vectors" checked />
+                Show vectors
+              </label>
+              <label class="popover-check">
+                <input type="checkbox" id="gravity" checked />
+                Gravity
+              </label>
+            </div>
+
+            <div class="popover popover-wide" id="popover-interactions" hidden>
+              <div class="interaction-modes" role="tablist" aria-label="Interaction modes">
+                <button type="button" class="mode-btn active" data-mode="tilt" title="Tilt">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M5 11.5V6l3-3.5 3 3.5v5.5" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <span>Tilt</span>
+                </button>
+                <button type="button" class="mode-btn" data-mode="bump" title="Table bump">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.25" />
+                    <path d="M8 2.5v2M8 11.5v2M2.5 8h2M11.5 8h2" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
+                  </svg>
+                  <span>Bump</span>
+                </button>
+                <button type="button" class="mode-btn" data-mode="wind" title="Wind">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M2.5 5.5h7a2 2 0 1 0 0-4M2.5 10.5h9a2.2 2.2 0 1 1 0 4.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
+                  </svg>
+                  <span>Wind</span>
+                </button>
+                <button type="button" class="mode-btn" data-mode="trace" title="Trace path">
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M2.5 12.5c2-4 4-6 6-8.5 1.5-1.8 3-2.5 5-2" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
+                  </svg>
+                  <span>Trace</span>
+                </button>
+              </div>
+              <p class="interaction-hint" id="interaction-hint">Drag the top to tilt it.</p>
+            </div>
           </div>
         </div>
       </div>

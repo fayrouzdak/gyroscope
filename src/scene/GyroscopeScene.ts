@@ -8,7 +8,7 @@ import { TABLE_RADIUS } from './tableSurface';
 
 export { TABLE_RADIUS };
 
-const LINE_COLOR = 0x7a1515;
+const LINE_COLOR = 0x1a8540;
 const BOLD_WIDTH = 2;
 const FINE_WIDTH = 1;
 
@@ -235,12 +235,22 @@ export function updateSpinningTopMesh(
   spinGroup.rotation.y = physics.spinAngle;
 }
 
+const VECTOR_ARROW_HEAD_LENGTH = 0.006;
+const VECTOR_ARROW_HEAD_WIDTH = 0.00525;
+
 export function createVectorArrow(
   color: number,
   length = 0.5,
 ): THREE.ArrowHelper {
   const dir = new THREE.Vector3(0, 1, 0);
-  return new THREE.ArrowHelper(dir, new THREE.Vector3(), length, color, 0.04, 0.02);
+  return new THREE.ArrowHelper(
+    dir,
+    new THREE.Vector3(),
+    length,
+    color,
+    VECTOR_ARROW_HEAD_LENGTH,
+    VECTOR_ARROW_HEAD_WIDTH,
+  );
 }
 
 export function updateVectorArrow(
@@ -263,7 +273,9 @@ export function updateVectorArrow(
   arrow.visible = true;
   arrow.position.copy(origin);
   arrow.setDirection(direction.clone().normalize());
-  arrow.setLength(len, len * 0.12, len * 0.06);
+  const headLength = Math.min(VECTOR_ARROW_HEAD_LENGTH, len * 0.3);
+  const headWidth = headLength * (VECTOR_ARROW_HEAD_WIDTH / VECTOR_ARROW_HEAD_LENGTH);
+  arrow.setLength(len, headLength, headWidth);
 }
 
 export const createGyroscopeMesh = createSpinningTopMesh;

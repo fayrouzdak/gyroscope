@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { buildSurfaceSamples } from '../topProfile';
+import type { TracePath } from './TracePath';
+import { CirclePath } from './TracePath';
 
 /** Tip friction torque scales (rad/s² and 1/s at friction = 1). */
 const COULOMB_FRICTION = 3.0;
@@ -45,9 +47,10 @@ export class SpinningTopPhysics {
   windDirX = 0;
   windDirZ = 0;
   windBurstStrength = 0;
-  /** Steer precession toward a traced circle (seconds remaining). */
-  precessionSteerTime = 0;
-  targetPrecessionRate = 0;
+  /** Constrained rolling path — tip slides along curve with gyroscopic coupling. */
+  tracePath: TracePath | null = null;
+  pathS = 0;
+  pathVelocity = 0;
 
   private readonly _surfaceSamples = buildSurfaceSamples();
   private readonly _orientation = new THREE.Quaternion();
@@ -70,7 +73,7 @@ export class SpinningTopPhysics {
       ...params,
     };
 
-    this.targetSpinRate = 80;
+    this.targetSpinRate = 25;
     this.reset();
   }
 
@@ -84,14 +87,25 @@ export class SpinningTopPhysics {
     this.windBurstRemaining = 0;
     this.windBurstDuration = 0;
     this.windBurstStrength = 0;
-    this.precessionSteerTime = 0;
-    this.targetPrecessionRate = 0;
+    this.tracePath = null;
+    this.pathS = 0;
+    this.pathVelocity = 0;
+    this.syncSpinAxis();
     this.plantTip();
+  }
+
+  /** Brings the top to rest. */
+  stopSpin(): void {
+    this.spinRate = 0;
   }
 
   /** Flick the top — sets spin to the speed chosen on the slider. */
   spinUp(): void {
     this.spinRate = this.targetSpinRate;
+    if (this.tracePath) {
+      this.prepareTraceRoll();
+      return;
+    }
     if (this.tilt < 1e-4) {
       this.azimuth = Math.random() * Math.PI * 2;
       this.syncSpinAxis();
@@ -139,32 +153,34 @@ export class SpinningTopPhysics {
     return this.windBurstRemaining > 0;
   }
 
-  /** Circle drawn on the table — steer precession to follow it for ~2 s. */
-  setPrecessionFromCircle(
-    cx: number,
-    cz: number,
-    radius: number,
-    clockwise: boolean,
-  ): boolean {
-    if (radius < 0.04) return false;
-
-    const sign = clockwise ? -1 : 1;
-    const rateMag = THREE.MathUtils.clamp(radius * 2.8, 0.6, 5.5);
-    this.targetPrecessionRate = sign * rateMag;
-    this.precessionSteerTime = 2.0;
-
-    if (this.tilt < 0.05) {
-      const toCenter = Math.atan2(cx, cz);
-      this.azimuth = toCenter;
-      this.tilt = Math.min(0.12, radius * 0.35);
-      this.syncSpinAxis();
+  /** Lock the tip to a drawn curve — rolling contact + gyroscopic precession. */
+  setTracePath(path: TracePath | null, seedX = 0, seedZ = 0): boolean {
+    if (!path) {
+      this.tracePath = null;
+      this.pathS = 0;
+      this.pathVelocity = 0;
+      this.plantTip();
+      return true;
     }
 
+    this.tracePath = path;
+    this.pathS = path.closestParameter(seedX, seedZ);
+    this.pathVelocity = 0;
+    this.plantTip();
+    this.prepareTraceRoll();
     return true;
   }
 
-  hasActivePrecessionSteer(): boolean {
-    return this.precessionSteerTime > 0;
+  clearTracePath(): void {
+    this.setTracePath(null);
+  }
+
+  hasActiveTrace(): boolean {
+    return this.tracePath !== null;
+  }
+
+  getPathSpeed(): number {
+    return this.pathVelocity;
   }
   applyTipPivotDrag(
     q: THREE.Quaternion,
@@ -344,7 +360,121 @@ export class SpinningTopPhysics {
   }
 
   private plantTip(): void {
-    this.tipPosition.set(0, this.floorY, 0);
+    if (this.tracePath) {
+      this.tracePath.sample(this.pathS, this.tipPosition);
+      this.tipPosition.y = this.floorY;
+    } else {
+      this.tipPosition.set(0, this.floorY, 0);
+      this.pathS = 0;
+      this.pathVelocity = 0;
+    }
+  }
+
+  /**
+   * Rolling contact on a constrained curve: spin drives roll speed (v ≈ r_eff · ω_s);
+   * friction damps slip against the ideal no-slip rate.
+   */
+  private applyTraceRolling(dt: number): void {
+    const path = this.tracePath;
+    if (!path) return;
+
+    const { mass, comHeight, friction } = this.params;
+
+    if (this.spinRate > 1 && this.tilt < 0.06) {
+      this.applyTraceTilt(path);
+    }
+
+    if (this.spinRate > 1) {
+      this.syncAzimuthToPath(path, dt);
+    }
+
+    const rollRate =
+      this.spinRate > 1
+        ? path.rollRateFromSpin(this.pathS, this.spinRate, this.tilt, comHeight)
+        : 0;
+
+    const slip = this.pathVelocity - rollRate;
+    const load = mass * this.params.gravity * (0.65 + 0.35 * this.getTiltFrictionScale());
+    const mu = friction;
+    const frictionAccel = (-mu * load * Math.tanh(slip / 0.06)) / mass;
+    const trackGain = 24 + mu * 14;
+    const blend = 1 - Math.exp(-trackGain * dt);
+
+    this.pathVelocity = THREE.MathUtils.lerp(this.pathVelocity, rollRate, blend);
+    this.pathVelocity += frictionAccel * dt;
+
+    if (Math.abs(slip) > 0.015 && mu > 0 && this.spinRate > 1) {
+      this.spinRate = Math.max(0, this.spinRate - Math.abs(slip) * mu * 0.18 * dt);
+    }
+
+    if (this.spinRate <= 1) {
+      this.pathVelocity = THREE.MathUtils.lerp(this.pathVelocity, 0, blend);
+    }
+
+    const nextS = this.pathS + this.pathVelocity * dt;
+    if (path.loops) {
+      this.pathS = path.clampS(nextS);
+    } else if (nextS <= 0) {
+      this.pathS = 0;
+      this.pathVelocity = 0;
+    } else if (nextS >= path.length) {
+      this.pathS = path.length;
+      this.pathVelocity = 0;
+    } else {
+      this.pathS = nextS;
+    }
+    this.plantTip();
+
+    if (this.getMinSurfaceY() < this.floorY) {
+      this.pathS = path.clampS(this.pathS - this.pathVelocity * dt);
+      this.pathVelocity *= 0.35;
+      this.plantTip();
+    }
+  }
+
+  /** Minimum tilt + lean so the tip can roll as soon as spin is applied. */
+  private applyTraceTilt(path: TracePath): void {
+    if (path.kind === 'circle') {
+      const circle = path as CirclePath;
+      const toCenter = Math.atan2(circle.cx - this.tipPosition.x, circle.cz - this.tipPosition.z);
+      this.azimuth = toCenter;
+      this.tilt = Math.max(this.tilt, Math.min(0.14, circle.radius * 0.32));
+    } else {
+      path.tangent(this.pathS, this._tau);
+      this.azimuth = Math.atan2(this._tau.x, this._tau.z);
+      this.tilt = Math.max(this.tilt, path.kind === 'line' ? 0.1 : 0.09);
+    }
+    this.syncSpinAxis();
+  }
+
+  private syncAzimuthToPath(path: TracePath, dt: number): void {
+    let targetAz: number;
+    if (path.kind === 'circle') {
+      const circle = path as CirclePath;
+      path.sample(this.pathS, this._worldPoint);
+      targetAz = Math.atan2(circle.cx - this._worldPoint.x, circle.cz - this._worldPoint.z);
+    } else {
+      path.tangent(this.pathS, this._tau);
+      targetAz = Math.atan2(this._tau.x, this._tau.z);
+    }
+    this.azimuth = lerpAngle(this.azimuth, targetAz, 1 - Math.exp(-8 * dt));
+    this.syncSpinAxis();
+  }
+
+  /** Align lean and set initial path speed when a trace is active. */
+  private prepareTraceRoll(): void {
+    const path = this.tracePath;
+    if (!path) return;
+
+    if (this.tilt < 0.06) {
+      this.applyTraceTilt(path);
+    }
+
+    this.pathVelocity =
+      this.spinRate > 1
+        ? path.rollRateFromSpin(this.pathS, this.spinRate, this.tilt, this.params.comHeight)
+        : 0;
+    this.plantTip();
   }
 
   private getMinSurfaceY(): number {
@@ -449,17 +579,16 @@ export class SpinningTopPhysics {
     this.applyExternalImpulses(dt);
     this.applyWindBurst(dt);
 
+    let psiDot = 0;
     if (gravityEnabled && this.spinRate > 1 && this.tilt > 1e-4) {
-      let psiDot =
+      psiDot =
         (mass * gravity * comHeight * Math.sin(this.tilt)) / (I_spin * this.spinRate);
       psiDot = Math.min(psiDot, 18);
+    }
 
-      if (this.precessionSteerTime > 0) {
-        const steerBlend = THREE.MathUtils.smoothstep(this.precessionSteerTime, 0, 2.0);
-        psiDot = THREE.MathUtils.lerp(psiDot, this.targetPrecessionRate, 0.72 * steerBlend);
-        this.precessionSteerTime = Math.max(0, this.precessionSteerTime - dt);
-      }
-
+    if (this.tracePath) {
+      this.applyTraceRolling(dt);
+    } else if (gravityEnabled && this.spinRate > 1 && this.tilt > 1e-4) {
       this.azimuth += psiDot * dt;
       this.syncSpinAxis();
 
@@ -467,11 +596,8 @@ export class SpinningTopPhysics {
         this.azimuth = azimuthBefore;
         this.syncSpinAxis();
       }
-    } else if (this.precessionSteerTime > 0 && this.spinRate > 1 && this.tilt > 1e-4) {
-      const steerBlend = THREE.MathUtils.smoothstep(this.precessionSteerTime, 0, 2.0);
-      this.azimuth += this.targetPrecessionRate * steerBlend * dt;
-      this.syncSpinAxis();
-      this.precessionSteerTime = Math.max(0, this.precessionSteerTime - dt);
+    } else {
+      this.plantTip();
     }
 
     this.applySpinFriction(dt);
